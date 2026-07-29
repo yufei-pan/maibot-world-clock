@@ -9,15 +9,15 @@ from pathlib import Path
 PLUGIN_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PLUGIN_DIR))
 
-from clock import (  # noqa: E402
-    dedupe_world_timezones,
-    display_zone_name,
-    format_clock_block,
-    load_zone,
-    normalize_zone_key,
-    resolve_primary_timezone,
-    wall_to_instant,
-)
+import plugin as world_clock  # noqa: E402
+
+dedupe_world_timezones = world_clock.dedupe_world_timezones
+display_zone_name = world_clock.display_zone_name
+format_clock_block = world_clock.format_clock_block
+load_zone = world_clock.load_zone
+normalize_zone_key = world_clock.normalize_zone_key
+resolve_primary_timezone = world_clock.resolve_primary_timezone
+wall_to_instant = world_clock.wall_to_instant
 
 
 def test_normalize_utc() -> None:

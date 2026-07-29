@@ -18,7 +18,10 @@ sys.path.insert(0, str(PLUGIN_DIR))
 sys.path.insert(0, str(PLUGIN_DIR.parent / "maibot-plugin-sdk"))
 
 import plugin as world_clock_plugin  # noqa: E402
-from clock import apply_planner_messages, format_clock_block, wall_to_instant  # noqa: E402
+
+apply_planner_messages = world_clock_plugin.apply_planner_messages
+format_clock_block = world_clock_plugin.format_clock_block
+wall_to_instant = world_clock_plugin.wall_to_instant
 
 
 def test_manifest() -> None:

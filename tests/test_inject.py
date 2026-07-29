@@ -12,7 +12,10 @@ import pytest
 PLUGIN_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PLUGIN_DIR))
 
-from clock import apply_planner_messages, apply_replyer_messages  # noqa: E402
+import plugin as world_clock  # noqa: E402
+
+apply_planner_messages = world_clock.apply_planner_messages
+apply_replyer_messages = world_clock.apply_replyer_messages
 
 PRIMARY = "America/Los_Angeles"
 WORLD = ["Asia/Shanghai", "UTC"]

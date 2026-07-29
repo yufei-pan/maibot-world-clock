@@ -96,7 +96,6 @@ flowchart TD
 ```
 maibot-world-clock/
   plugin.py
-  clock.py
   _manifest.json
   config.default.toml
   README.md
@@ -109,7 +108,7 @@ maibot-world-clock/
     test_inject.py
 ```
 
-Pure clock logic lives in `clock.py` (resolve, parse, format, match/rewrite helpers). `plugin.py` owns SDK wiring, config model, lifecycle, and hooks only.
+All logic lives in `plugin.py` (Host Runner only reliably loads that entry module; no sibling-module imports).
 
 ---
 
