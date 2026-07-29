@@ -186,41 +186,6 @@ def parse_replyer_time_prefix(text: str) -> tuple[datetime, str] | None:
     return wall, remainder
 
 
-def _message_text(content: Any) -> str | None:
-    if isinstance(content, str):
-        return content
-    return None
-
-
-def _set_message_text(message: MutableMapping[str, Any], text: str) -> None:
-    message["content"] = text
-
-
-def _iter_user_message_targets(messages: list[Any]) -> list[tuple[int, MutableMapping[str, Any], str]]:
-    """收集 role=user 且 content 为纯字符串的消息。"""
-
-    targets: list[tuple[int, MutableMapping[str, Any], str]] = []
-    for index, item in enumerate(messages):
-        if not isinstance(item, MutableMapping):
-            continue
-        if item.get("role") != "user":
-            continue
-        text = _message_text(item.get("content"))
-        if text is None:
-            # 多模态：尝试改写首个 text part
-            content = item.get("content")
-            if isinstance(content, list):
-                for part in content:
-                    if isinstance(part, MutableMapping) and part.get("type") == "text":
-                        part_text = part.get("text")
-                        if isinstance(part_text, str):
-                            targets.append((index, part, part_text))  # type: ignore[arg-type]
-                        break
-            continue
-        targets.append((index, item, text))
-    return targets
-
-
 def _append_user_message(messages: list[Any], text: str) -> list[Any]:
     out = list(messages)
     out.append({"role": "user", "content": text})

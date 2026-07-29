@@ -1,0 +1,31 @@
+{
+  "manifest_version": 2,
+  "id": "com.0-hz.world-clock",
+  "version": "0.1.0",
+  "name": "世界时钟（World Clock）",
+  "description": "在 Maisaka 规划器与回复器请求模型前，把 Host 注入的无时区时间提示改写（或追加）为带 IANA 与缩写的本地时间 / 世界时间块。默认展示进程本地时区，并附加 Asia/Shanghai 与 UTC（与本地相同时自动去重）。",
+  "author": {
+    "name": "kes",
+    "url": "https://github.com/yufei-pan"
+  },
+  "license": "MIT",
+  "urls": {
+    "repository": "https://github.com/yufei-pan/maibot-world-clock",
+    "homepage": "https://github.com/yufei-pan/maibot-world-clock",
+    "documentation": "https://github.com/yufei-pan/maibot-world-clock/blob/main/README.md",
+    "issues": "https://github.com/yufei-pan/maibot-world-clock/issues"
+  },
+  "host_application": {
+    "min_version": "1.0.0",
+    "max_version": "1.99.99"
+  },
+  "sdk": {
+    "min_version": "2.5.1",
+    "max_version": "2.99.99"
+  },
+  "dependencies": [],
+  "capabilities": [],
+  "i18n": {
+    "default_locale": "zh-CN"
+  }
+}

@@ -1,0 +1,27 @@
+# 世界时钟（World Clock）插件配置
+#
+# 各字段留空或不写时使用插件内置默认。不要手改本文件里的 secrets（本插件无密钥）。
+
+[plugin]
+# 是否启用插件
+enabled = true
+# 配置版本
+config_version = "1.0.0"
+
+[clock]
+# 可选：覆盖进程时区作为「本地时间」。留空 = 自动解析（环境变量 TZ 或 /etc/localtime）
+# primary_timezone = "America/Los_Angeles"
+
+# 世界时区列表（IANA）。与本地相同时会自动去掉；去重后为空则不渲染「世界时间」块
+world_timezones = ["Asia/Shanghai", "UTC"]
+
+# 注入模式：
+#   replace — 改写 Host 原有时间字符串（默认）
+#   append  — 不改写，只追加世界时钟块（Host 文案变更时的兼容模式）
+# mode = "replace"
+
+# replace 模式下若未匹配到 Host 时间字符串：
+#   warn_and_append — 打警告并退化为本次 append（默认）
+#   warn_only       — 仅警告，不追加
+#   error           — 抛错（由 Host 记录 Hook 失败；不会中止聊天）
+# on_no_match = "warn_and_append"
