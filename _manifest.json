@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "id": "com.0-hz.world-clock",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "name": "世界时钟（World Clock）",
   "description": "在 Maisaka 规划器与回复器请求模型前，把 Host 注入的无时区时间提示改写（或追加）为带 IANA 与缩写的本地时间 / 世界时间块。默认展示进程本地时区，并附加 Asia/Shanghai 与 UTC（与本地相同时自动去重）。",
   "author": {

@@ -12,11 +12,13 @@ import os
 import re
 import shutil
 from collections.abc import Mapping, MutableMapping, Sequence
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from types import UnionType
 from typing import Any, Union, get_args, get_origin
+from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from maibot_sdk import CONFIG_RELOAD_SCOPE_SELF, Field, HookHandler, MaiBotPlugin, PluginConfigBase
@@ -26,6 +28,7 @@ from maibot_sdk.types import ErrorPolicy, HookMode, HookOrder
 CURRENT_CONFIG_VERSION = "1.0.0"
 SHIPPED_CONFIG_TEMPLATE_NAME = "config.default.toml"
 HOOK_TIMEOUT_MS = 5000
+CONTEXT_ITEM_SCHEMA_VERSION = 1
 
 DEFAULT_WORLD_TIMEZONES = ["Asia/Shanghai", "UTC"]
 DEFAULT_MODE = "replace"
@@ -212,6 +215,112 @@ def _append_user_message(messages: list[Any], text: str) -> list[Any]:
     out = list(messages)
     out.append({"role": "user", "content": text})
     return out
+
+
+def _new_user_context_item(text: str) -> dict[str, Any]:
+    """构造 MaiBot 1.2 Hook 可反序列化的 UserMessageItem。"""
+
+    return {
+        "item_type": "UserMessageItem",
+        "meta": {
+            "item_id": uuid4().hex,
+            "logical_turn_id": None,
+            "timestamp": datetime.now().astimezone().isoformat(),
+        },
+        "parts": [{"type": "text", "text": text}],
+    }
+
+
+def _context_items_to_legacy_messages(items: list[Any]) -> list[dict[str, Any]]:
+    """把消息型 Context Item 映射到现有时间改写器使用的内部形状。"""
+
+    role_by_item_type = {
+        "SystemMessageItem": "system",
+        "UserMessageItem": "user",
+        "AssistantMessageItem": "assistant",
+    }
+    messages: list[dict[str, Any]] = []
+    for index, item in enumerate(items):
+        if not isinstance(item, Mapping):
+            continue
+        role = role_by_item_type.get(str(item.get("item_type") or ""))
+        parts = item.get("parts")
+        if role is None or not isinstance(parts, list):
+            continue
+        messages.append(
+            {
+                "role": role,
+                "content": deepcopy(parts),
+                "_context_item_index": index,
+            }
+        )
+    return messages
+
+
+def _merge_legacy_messages_into_context_items(
+    original_items: list[Any],
+    messages: list[Any],
+) -> list[Any]:
+    """把时间改写结果合回 Items，同时完整保留原 Item 的其他字段。"""
+
+    items = deepcopy(original_items)
+    for message in messages:
+        if not isinstance(message, Mapping):
+            continue
+        item_index = message.get("_context_item_index")
+        content = message.get("content")
+        if isinstance(item_index, int) and 0 <= item_index < len(items):
+            item = items[item_index]
+            if isinstance(item, MutableMapping) and isinstance(content, list):
+                item["parts"] = deepcopy(content)
+            continue
+        if message.get("role") == "user" and isinstance(content, str):
+            items.append(_new_user_context_item(content))
+    return items
+
+
+def apply_planner_items(
+    items: list[Any],
+    *,
+    primary: str,
+    world: Sequence[str],
+    mode: str,
+    on_no_match: str,
+    now: datetime | None = None,
+) -> tuple[list[Any], str | None]:
+    """在保留 Item 元数据的前提下复用 planner 时间改写语义。"""
+
+    messages, warning = apply_planner_messages(
+        _context_items_to_legacy_messages(items),
+        primary=primary,
+        world=world,
+        mode=mode,
+        on_no_match=on_no_match,
+        now=now,
+    )
+    return _merge_legacy_messages_into_context_items(items, messages), warning
+
+
+def apply_replyer_items(
+    items: list[Any],
+    *,
+    primary: str,
+    world: Sequence[str],
+    mode: str,
+    on_no_match: str,
+    now: datetime | None = None,
+) -> tuple[list[Any], str | None]:
+    """在保留 Item 元数据的前提下复用 replyer 时间改写语义。"""
+
+    messages, warning = apply_replyer_messages(
+        _context_items_to_legacy_messages(items),
+        primary=primary,
+        world=world,
+        mode=mode,
+        on_no_match=on_no_match,
+        now=now,
+    )
+    return _merge_legacy_messages_into_context_items(items, messages), warning
 
 
 def _resolve_now(now: datetime | None, primary: str) -> datetime:
@@ -654,19 +763,30 @@ class WorldClockPlugin(MaiBotPlugin):
         settings = self._require_settings()
         if not settings.enabled:
             return {"action": "continue"}
-        messages = kwargs.get("messages")
-        if not isinstance(messages, list):
-            return {"action": "continue"}
-        new_messages, warning = apply_planner_messages(
-            messages,
-            primary=settings.primary_timezone,
-            world=settings.world_timezones,
-            mode=settings.mode,
-            on_no_match=settings.on_no_match,
-        )
+        items = kwargs.get("items")
+        if isinstance(items, list) and kwargs.get("item_schema_version") == CONTEXT_ITEM_SCHEMA_VERSION:
+            new_items, warning = apply_planner_items(
+                items,
+                primary=settings.primary_timezone,
+                world=settings.world_timezones,
+                mode=settings.mode,
+                on_no_match=settings.on_no_match,
+            )
+            kwargs["items"] = new_items
+        else:
+            messages = kwargs.get("messages")
+            if not isinstance(messages, list):
+                return {"action": "continue"}
+            new_messages, warning = apply_planner_messages(
+                messages,
+                primary=settings.primary_timezone,
+                world=settings.world_timezones,
+                mode=settings.mode,
+                on_no_match=settings.on_no_match,
+            )
+            kwargs["messages"] = new_messages
         if warning:
             self.ctx.logger.warning("%s", warning)
-        kwargs["messages"] = new_messages
         return {"action": "continue", "modified_kwargs": kwargs}
 
     @HookHandler(
@@ -682,19 +802,30 @@ class WorldClockPlugin(MaiBotPlugin):
         settings = self._require_settings()
         if not settings.enabled:
             return {"action": "continue"}
-        messages = kwargs.get("messages")
-        if not isinstance(messages, list):
-            return {"action": "continue"}
-        new_messages, warning = apply_replyer_messages(
-            messages,
-            primary=settings.primary_timezone,
-            world=settings.world_timezones,
-            mode=settings.mode,
-            on_no_match=settings.on_no_match,
-        )
+        items = kwargs.get("items")
+        if isinstance(items, list) and kwargs.get("item_schema_version") == CONTEXT_ITEM_SCHEMA_VERSION:
+            new_items, warning = apply_replyer_items(
+                items,
+                primary=settings.primary_timezone,
+                world=settings.world_timezones,
+                mode=settings.mode,
+                on_no_match=settings.on_no_match,
+            )
+            kwargs["items"] = new_items
+        else:
+            messages = kwargs.get("messages")
+            if not isinstance(messages, list):
+                return {"action": "continue"}
+            new_messages, warning = apply_replyer_messages(
+                messages,
+                primary=settings.primary_timezone,
+                world=settings.world_timezones,
+                mode=settings.mode,
+                on_no_match=settings.on_no_match,
+            )
+            kwargs["messages"] = new_messages
         if warning:
             self.ctx.logger.warning("%s", warning)
-        kwargs["messages"] = new_messages
         return {"action": "continue", "modified_kwargs": kwargs}
 
 
